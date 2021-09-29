@@ -1,28 +1,26 @@
 import numpy as np
-from numba import njit
+from numba import jit
 from numba import types
-from numba.typed import Dict
 
 float_array = types.float64[:]
 
-@njit(fastmath=True, parallel=False)
+@jit(["Tuple((float64[:,:], float64[:,:], float64[:,:], float64[:]))\
+    (float64[:,:], float64[:,:], int32, float32)"], fastmath=True,
+    parallel=False)
 def matching_pursuit(
     signal: np.ndarray,
     dictionary: np.ndarray,
-    m: int = -1,
+    m: int = 0,
     eps: float = 1e-3
 ):
-    if m == -1:
-        m = int(dictionary.shape[1])
+    if m <= 0 or m > dictionary.shape[1]:
+        m = dictionary.shape[1]
         
-    residual = np.copy(signal)
+    residual = np.ascontiguousarray(np.copy(signal))
+    dictionary = np.ascontiguousarray(dictionary)
     coefficients = np.full((1, m), 0.)
     atoms = np.full((signal.shape[1], m), 0.)
-    cache = Dict.empty(
-        key_type=types.unicode_type,
-        value_type=float_array,
-    )
-    cache["errors"] = np.full(m, 0., dtype=np.float64)
+    errors = np.full(m, 0.)
 
     i = 0
     while np.sum(np.square(residual)) > eps:
@@ -33,34 +31,35 @@ def matching_pursuit(
         atoms[:, i] = dictionary[:, max_ind]
 
         residual = residual - coefficients[:, i] * atoms[:, i]
-        cache["errors"][i] = np.sum(np.square(residual))
+        errors[i] = np.sum(np.square(residual))
         i += 1
 
         if i == m or dictionary.size == 0:
             break
 
+    errors = errors[:i]
     coefficients = coefficients[:, :i]
     atoms = atoms[:, :i]
 
-    return coefficients, atoms, residual, cache
+    return coefficients, atoms, residual, errors
 
-@njit(fastmath=True, parallel=False)
+@jit(["Tuple((float64[:,:], float64[:,:], float64[:,:], float64[:]))\
+    (float64[:,:], float64[:,:], int32, float32)"], fastmath=True,
+    parallel=False)
 def orthogonal_matching_pursuit(
     signal: np.ndarray,
     dictionary: np.ndarray,
-    m: int = -1,
+    m: int = 0,
     eps: float = 1e-3
 ):
-    if m == -1:
-        m = int(dictionary.shape[1])
+    if m <= 0 or m > dictionary.shape[1]:
+        m = dictionary.shape[1]
 
-    residual = np.copy(signal)
-    atoms = np.full((signal.shape[1], m), 0.)
-    cache = Dict.empty(
-        key_type=types.unicode_type,
-        value_type=float_array,
-    )
-    cache["errors"] = np.full(m, 0., dtype=np.float64)
+    signal = np.ascontiguousarray(signal)
+    residual = np.ascontiguousarray(signal)
+    dictionary = np.ascontiguousarray(dictionary)
+    atoms = np.full((signal.shape[1], m), 0., np.float64)
+    errors = np.full(m, 0., np.float64)
 
     i = 0
     while np.sum(np.square(residual)) > eps:
@@ -74,32 +73,30 @@ def orthogonal_matching_pursuit(
         A = np.ascontiguousarray(atoms[:, :i+1])
         P = np.dot(A, np.dot(np.linalg.inv(np.dot(A.T, A)), A.T))
         residual = signal - np.dot(signal, P)
-        cache["errors"][i] = np.sum(np.square(residual))
+        errors[i] = np.sum(np.square(residual))
         
         i += 1
         if i == m or dictionary.size == 0:
             break
     
-    cache["errors"] = cache["errors"][:i]
+    errors = errors[:i]
     atoms = np.ascontiguousarray(atoms[:, :i])
     coefficients = np.dot(signal, np.dot(np.linalg.inv(np.dot(atoms.T, atoms)),
         atoms.T).T)
-    return coefficients, atoms, residual, cache
+    return coefficients, atoms, residual, errors
 
-@njit(fastmath=True, parallel=False)
+@jit(["float64[:,:](float64[:,:], float64[:,:], float64[:,:], float64[:,:])"],
+    fastmath=True, parallel=False)
 def reconstruct_signal(
     coefficients: np.ndarray,
     atoms: np.ndarray,
-    residual: np.ndarray = None,
-    signal: np.ndarray = None
+    residual: np.ndarray,
+    signal: np.ndarray
 ):
     reconstructed_signal = np.full((1, len(atoms)), 0.)
-    reconstructed_signal[0, :] = np.sum(coefficients * atoms, axis=1)
-    if residual is not None:
-        reconstructed_signal += residual
-    if signal is not None:
-        mse = np.sum(np.power(signal - reconstructed_signal, 2))
-        rmse = np.sqrt(np.sum(np.power(signal - reconstructed_signal, 2)))
-        print("MSE: ", mse)
-        print("RMSE:", rmse)
+    reconstructed_signal[0, :] = np.sum(coefficients * atoms, axis=1) + residual
+    mse = np.sum(np.power(signal - reconstructed_signal, 2))
+    rmse = np.sqrt(np.sum(np.power(signal - reconstructed_signal, 2)))
+    print("MSE: ", mse)
+    print("RMSE:", rmse)
     return reconstructed_signal
