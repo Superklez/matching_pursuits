@@ -1,6 +1,7 @@
 import numpy as np
 from numba import jit
 from numba import types
+from utils import delete_column
 
 float_array = types.float64[:]
 
@@ -32,8 +33,11 @@ def matching_pursuit(
 
         residual = residual - coefficients[:, i] * atoms[:, i]
         errors[i] = np.sum(np.square(residual))
-        i += 1
 
+        # Removing the deletion step makes computation faster in some cases.
+        dictionary = np.ascontiguousarray(delete_column(dictionary, max_ind))
+
+        i += 1
         if i == m or dictionary.size == 0:
             break
 
@@ -74,6 +78,9 @@ def orthogonal_matching_pursuit(
         P = np.dot(A, np.dot(np.linalg.inv(np.dot(A.T, A)), A.T))
         residual = signal - np.dot(signal, P)
         errors[i] = np.sum(np.square(residual))
+
+        # Removing the deletion step makes computation faster in some cases.
+        dictionary = np.ascontiguousarray(delete_column(dictionary, max_ind))
         
         i += 1
         if i == m or dictionary.size == 0:
@@ -84,19 +91,3 @@ def orthogonal_matching_pursuit(
     coefficients = np.dot(signal, np.dot(np.linalg.inv(np.dot(atoms.T, atoms)),
         atoms.T).T)
     return coefficients, atoms, residual, errors
-
-@jit(["float64[:,:](float64[:,:], float64[:,:], float64[:,:], float64[:,:])"],
-    fastmath=True, parallel=False)
-def reconstruct_signal(
-    coefficients: np.ndarray,
-    atoms: np.ndarray,
-    residual: np.ndarray,
-    signal: np.ndarray
-):
-    reconstructed_signal = np.full((1, len(atoms)), 0.)
-    reconstructed_signal[0, :] = np.sum(coefficients * atoms, axis=1) + residual
-    mse = np.sum(np.power(signal - reconstructed_signal, 2))
-    rmse = np.sqrt(np.sum(np.power(signal - reconstructed_signal, 2)))
-    print("MSE: ", mse)
-    print("RMSE:", rmse)
-    return reconstructed_signal
