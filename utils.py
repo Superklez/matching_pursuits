@@ -2,16 +2,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numba import jit
 
-@jit(["float64[:,:](float64[:,:], float64[:,:], float64[:,:], float64[:,:])"],
+@jit(["float64[:,:](float64[:,:], float64[:,:], float64[:,:])"],
     fastmath=True, parallel=False)
 def reconstruct_signal(
     coefficients: np.ndarray,
     atoms: np.ndarray,
-    residual: np.ndarray,
     signal: np.ndarray
 ):
     reconstructed_signal = np.full((1, len(atoms)), 0.)
-    reconstructed_signal[0, :] = np.sum(coefficients * atoms, axis=1) + residual
+    reconstructed_signal[0, :] = np.sum(coefficients * atoms, axis=1)
     mse = np.sum(np.power(signal - reconstructed_signal, 2))
     rmse = np.sqrt(np.sum(np.power(signal - reconstructed_signal, 2)))
     print("MSE: ", mse)
@@ -21,7 +20,7 @@ def reconstruct_signal(
 @jit(["float64[:,:](float64[:,:], int32)", "int64[:,:](int64[:,:], int32)"],
      fastmath=True, parallel=False)
 def delete_column(arr, num):
-    mask = np.zeros(arr.shape[1], dtype=np.int32) == 0
+    mask = np.full(arr.shape[1], 0.) == 0
     mask[num] = False
     return arr[:, mask]
 
