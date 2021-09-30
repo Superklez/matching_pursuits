@@ -1,7 +1,7 @@
 import numpy as np
 from numba import jit
 from numba import types
-from utils import delete_column
+from .utils import delete_column
 
 float_array = types.float64[:]
 
