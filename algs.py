@@ -34,6 +34,10 @@ def matching_pursuit(
 
         residual = residual - coefficients[k] * atoms[:, k]
         errors[k] = np.sqrt(np.sum(np.square(residual)))
+        # Early stopping when the solution diverges
+        if k >= 1 and errors[k] > errors[k-1]:
+            print("WARNING: Diverging solution. Ending approximation loop.")
+            break
 
         # Removing the deletion step makes computation faster in some cases.
         dictionary = np.ascontiguousarray(delete_column(dictionary, max_ind))
@@ -69,7 +73,7 @@ def orthogonal_matching_pursuit(
     errors = np.full(K, 0., np.float64)
 
     k = 0
-    while np.sqrt(np.sum(np.square(residual))) > eps:
+    while np.sqrt(np.sum(np.square(residual))) > eps  and k < min([K, m//N]):
         dot_product = np.dot(residual, dictionary)
         inds = np.abs(dot_product).argsort()[-N:][::-1]
 
@@ -81,6 +85,10 @@ def orthogonal_matching_pursuit(
         estimate = np.dot(np.dot(np.linalg.inv(np.dot(A.T, A)), A.T), signal)
         residual = signal - np.dot(A, estimate)
         errors[k] = np.sqrt(np.sum(np.square(residual)))
+        # Early stopping when the solution diverges
+        if k >= 1 and errors[k] > errors[k-1]:
+            print("WARNING: Diverging solution. Ending approximation loop.")
+            break
 
         # Removing the deletion step makes computation faster in some cases.
         dictionary = np.ascontiguousarray(delete_column(dictionary, inds))
@@ -91,5 +99,6 @@ def orthogonal_matching_pursuit(
 
     errors = errors[:k]
     atoms = np.ascontiguousarray(atoms[:, :k*N])
-    coefficients = estimate
+    coefficients = np.dot(np.dot(np.linalg.inv(np.dot(atoms.T, atoms)),
+        atoms.T), signal)
     return coefficients, atoms, residual, errors
