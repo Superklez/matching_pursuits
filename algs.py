@@ -6,10 +6,8 @@ from .utils import delete_column
 float_array = types.float64[:]
 
 @jit(["Tuple((float64[:], float64[:,:], float64[:], float64[:]))\
-    (float64[:], float64[:,:], int32, float32)",
-    "Tuple((float32[:], float32[:,:], float32[:], float32[:]))\
-    (float32[:], float32[:,:], int32, float32)"],
-    fastmath=True, parallel=False)
+    (float64[:], float64[:,:], int32, float32)"], fastmath=True,
+    parallel=False)
 def matching_pursuit(
     signal: np.ndarray,
     dictionary: np.ndarray,
@@ -55,10 +53,8 @@ def matching_pursuit(
     return coefficients, atoms, residual, errors
 
 @jit(["Tuple((float64[:], float64[:,:], float64[:], float64[:]))\
-    (float64[:], float64[:,:], int32, int32, float32)",
-    "Tuple((float32[:], float32[:,:], float32[:], float32[:]))\
-    (float32[:], float32[:,:], int32, int32, float32)"],
-    fastmath=True, parallel=False)
+    (float64[:], float64[:,:], int32, int32, float32)"], fastmath=True,
+    parallel=False)
 def orthogonal_matching_pursuit(
     signal: np.ndarray,
     dictionary: np.ndarray,
