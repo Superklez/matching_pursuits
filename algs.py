@@ -35,9 +35,11 @@ def matching_pursuit(
         residual = residual - coefficients[k] * atoms[:, k]
         errors[k] = np.sqrt(np.sum(np.square(residual)))
         # Early stopping when the solution diverges
-        if (k >= 1 and errors[k] > errors[k-1]) or (abs(errors[k] - \
-            errors[k-1]) < eps):
+        if k >= 1 and errors[k] > errors[k-1]:
             print("WARNING: Diverging solution. Ending approximation loop.")
+            break
+        if abs(errors[k] - errors[k-1]) < eps:
+            print("WARNING: Solution not improving. Ending approximation loop.")
             break
 
         # Removing the deletion step makes computation faster in some cases.
@@ -87,9 +89,11 @@ def orthogonal_matching_pursuit(
         residual = signal - np.dot(A, estimate)
         errors[k] = np.sqrt(np.sum(np.square(residual)))
         # Early stopping when the solution diverges
-        if (k >= 1 and errors[k] > errors[k-1]) or (abs(errors[k] - \
-            errors[k-1]) < eps):
+        if k >= 1 and errors[k] > errors[k-1]:
             print("WARNING: Diverging solution. Ending approximation loop.")
+            break
+        if abs(errors[k] - errors[k-1]) < eps:
+            print("WARNING: Solution not improving. Ending approximation loop.")
             break
 
         # Removing the deletion step makes computation faster in some cases.
