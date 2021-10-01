@@ -2,26 +2,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numba import jit
 
-@jit(["float64[:,:](float64[:,:], float64[:,:], float64[:,:])"],
+@jit(["float64[:](float64[:], float64[:,:], float64[:])"],
     fastmath=True, parallel=False)
 def reconstruct_signal(
     coefficients: np.ndarray,
     atoms: np.ndarray,
     signal: np.ndarray
 ):
-    reconstructed_signal = np.full((1, len(atoms)), 0.)
-    reconstructed_signal[0, :] = np.sum(coefficients * atoms, axis=1)
+    reconstructed_signal = np.sum(atoms * coefficients, axis=1)
     mse = np.sum(np.power(signal - reconstructed_signal, 2))
-    rmse = np.sqrt(np.sum(np.power(signal - reconstructed_signal, 2)))
+    rmse = np.sqrt(mse)
     print("MSE: ", mse)
     print("RMSE:", rmse)
     return reconstructed_signal
 
-@jit(["float64[:,:](float64[:,:], int32)", "int64[:,:](int64[:,:], int32)"],
+@jit(["float64[:,:](float64[:,:], int64[:])",
+      "float64[:,:](float64[:,:], int32)",
+      "int64[:,:](int64[:,:], int64[:])",
+      "int64[:,:](int64[:,:], int32)"],
      fastmath=True, parallel=False)
-def delete_column(arr, num):
+def delete_column(arr, inds):
     mask = np.full(arr.shape[1], 0.) == 0
-    mask[num] = False
+    mask[inds] = False
     return arr[:, mask]
 
 def plot_approximation(
@@ -42,16 +44,16 @@ def plot_approximation(
             fig, ax = plt.subplots(max_order + 2, 1, **kwargs)
         else:
             fig, ax = plt.subplots(max_order + 1, **kwargs)
-        ax[0].plot(signal[0], label="original signal")
+        ax[0].plot(signal, label="original signal")
         ax[0].grid(True)
         ax[0].legend(loc="upper right")
         for i in range(max_order):
-            ax[i+1].plot(coefficients[:, i] * atoms[:, i],
+            ax[i+1].plot(coefficients[i] * atoms[:, i],
                 label=f"approx order {i+1}")
             ax[i+1].grid(True)
             ax[i+1].legend(loc="upper right")
         if residual is not None:
-            ax[max_order+1].plot(residual[0],
+            ax[max_order+1].plot(residual,
                 label=f"residual order {atoms.shape[1]}")
             ax[max_order+1].grid(True)
             ax[max_order+1].legend(loc="upper right")
@@ -61,12 +63,12 @@ def plot_approximation(
         else:
             fig, ax = plt.subplots(max_order, 1, **kwargs)
         for i in range(max_order):
-            ax[i].plot(coefficients[:, i] * atoms[:, i],
+            ax[i].plot(coefficients[i] * atoms[:, i],
                 label=f"approx order {i+1}")
             ax[i].grid(True)
             ax[i].legend(loc="upper right")
         if residual is not None:
-            ax[max_order].plot(residual[0],
+            ax[max_order].plot(residual,
                 label=f"residual order {atoms.shape[1]}")
             ax[max_order].grid(True)
             ax[max_order].legend(loc="upper right")
@@ -81,24 +83,24 @@ def plot_reconstructed_signal(
 ):
     if signal is not None and split:
         fig, ax = plt.subplots(2, 1, **kwargs)
-        ax[0].plot(signal[0], color="#1f77b4", linestyle='-',
+        ax[0].plot(signal, color="#1f77b4", linestyle='-',
             label="original signal")
-        ax[1].plot(reconstructed_signal[0], color="#ff7f0e", linestyle='-',
+        ax[1].plot(reconstructed_signal, color="#ff7f0e", linestyle='-',
             label="reconstructed signal")
         for i in range(2):
             ax[i].legend(loc="upper right")
             ax[i].grid(True)
     elif signal is not None and not split:
         fig, ax = plt.subplots(1, 1, **kwargs)
-        ax.plot(signal[0], color="#1f77b4", linestyle='-',
+        ax.plot(signal, color="#1f77b4", linestyle='-',
             label="original signal")
-        ax.plot(reconstructed_signal[0], color="#ff7f0e", linestyle='--',
+        ax.plot(reconstructed_signal, color="#ff7f0e", linestyle='--',
             label="reconstructed signal")
         ax.grid(True)
         ax.legend(loc="upper right")
     else:
         fig, ax = plt.subplots(1, 1, **kwargs)
-        ax.plot(reconstructed_signal[0], color="#ff7f0e", linestyle='-',
+        ax.plot(reconstructed_signal, color="#ff7f0e", linestyle='-',
             label="reconstructed signal")
         ax.grid(True)
         ax.legend(loc="upper right")

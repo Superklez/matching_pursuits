@@ -5,88 +5,136 @@ from .utils import delete_column
 
 float_array = types.float64[:]
 
-@jit(["Tuple((float64[:,:], float64[:,:], float64[:,:], float64[:]))\
-    (float64[:,:], float64[:,:], int32, float32)"], fastmath=True,
+@jit(["Tuple((float64[:], float64[:,:], float64[:], float64[:]))\
+    (float64[:], float64[:,:], int32, float32)"], fastmath=True,
     parallel=False)
 def matching_pursuit(
     signal: np.ndarray,
     dictionary: np.ndarray,
-    m: int = 0,
+    K: int = 0,
     eps: float = 1e-3
 ):
-    if m <= 0 or m > dictionary.shape[1]:
-        m = dictionary.shape[1]
-        
-    residual = np.ascontiguousarray(np.copy(signal))
+    if K <= 0 or K > dictionary.shape[1]:
+        K = dictionary.shape[1]
+    
+    m = len(signal)
+    residual = np.ascontiguousarray(signal)
     dictionary = np.ascontiguousarray(dictionary)
-    coefficients = np.full((1, m), 0.)
-    atoms = np.full((signal.shape[1], m), 0.)
-    errors = np.full(m, 0.)
+    coefficients = np.full(K, 0.)
+    atoms = np.full((m, K), 0.)
+    errors = np.full(K, 0.)
 
-    i = 0
+    k = 0
     while np.sqrt(np.sum(np.square(residual))) > eps:
         dot_product = np.dot(residual, dictionary)
         max_ind = np.argmax(np.abs(dot_product))
 
-        coefficients[:, i] = dot_product[:, max_ind]
-        atoms[:, i] = dictionary[:, max_ind]
+        coefficients[k] = dot_product[max_ind]
+        atoms[:, k] = dictionary[:, max_ind]
 
-        residual = residual - coefficients[:, i] * atoms[:, i]
-        errors[i] = np.sqrt(np.sum(np.square(residual)))
+        residual = residual - coefficients[k] * atoms[:, k]
+        errors[k] = np.sqrt(np.sum(np.square(residual)))
 
         # Removing the deletion step makes computation faster in some cases.
         dictionary = np.ascontiguousarray(delete_column(dictionary, max_ind))
 
-        i += 1
-        if i == m or dictionary.size == 0:
+        k += 1
+        if k == K or dictionary.size == 0:
             break
 
-    errors = errors[:i]
-    coefficients = coefficients[:, :i]
-    atoms = atoms[:, :i]
+    errors = errors[:k]
+    coefficients = coefficients[:k]
+    atoms = atoms[:, :k]
 
     return coefficients, atoms, residual, errors
 
-@jit(["Tuple((float64[:,:], float64[:,:], float64[:,:], float64[:]))\
-    (float64[:,:], float64[:,:], int32, float32)"], fastmath=True,
+@jit(["Tuple((float64[:], float64[:,:], float64[:], float64[:]))\
+    (float64[:], float64[:,:], int32, float32)"], fastmath=True,
     parallel=False)
 def orthogonal_matching_pursuit(
     signal: np.ndarray,
     dictionary: np.ndarray,
-    m: int = 0,
+    K: int = 0,
     eps: float = 1e-3
 ):
-    if m <= 0 or m > dictionary.shape[1]:
-        m = dictionary.shape[1]
+    if K <= 0 or K > dictionary.shape[1]:
+        K = dictionary.shape[1]
 
+    m = len(signal)
     signal = np.ascontiguousarray(signal)
     residual = np.ascontiguousarray(signal)
     dictionary = np.ascontiguousarray(dictionary)
-    atoms = np.full((signal.shape[1], m), 0., np.float64)
-    errors = np.full(m, 0., np.float64)
+    atoms = np.full((m, K), 0., np.float64)
+    errors = np.full(K, 0., np.float64)
 
-    i = 0
+    k = 0
     while np.sqrt(np.sum(np.square(residual))) > eps:
         dot_product = np.dot(residual, dictionary)
         max_ind = np.argmax(np.abs(dot_product))
 
-        atoms[:, i] = dictionary[:, max_ind]
+        atoms[:, k] = dictionary[:, max_ind]
 
         # If dictionary contains complex values,
         # use np.conj(A).T instead of A.T
-        A = np.ascontiguousarray(atoms[:, :i+1])
-        estimate = np.dot(np.dot(np.linalg.inv(np.dot(A.T, A)), A.T), signal.T)
-        residual = signal - np.dot(A, estimate).T
-        errors[i] = np.sqrt(np.sum(np.square(residual)))
+        A = np.ascontiguousarray(atoms[:, :k+1])
+        estimate = np.dot(np.dot(np.linalg.inv(np.dot(A.T, A)), A.T), signal)
+        residual = signal - np.dot(A, estimate)
+        errors[k] = np.sqrt(np.sum(np.square(residual)))
 
         # Removing the deletion step makes computation faster in some cases.
         dictionary = np.ascontiguousarray(delete_column(dictionary, max_ind))
         
-        i += 1
-        if i == m or dictionary.size == 0:
+        k += 1
+        if k == K or dictionary.size == 0:
             break
     
-    errors = errors[:i]
-    atoms = np.ascontiguousarray(atoms[:, :i])
-    coefficients = estimate.T
+    errors = errors[:k]
+    atoms = np.ascontiguousarray(atoms[:, :k])
+    coefficients = estimate
+    return coefficients, atoms, residual, errors
+
+@jit(["Tuple((float64[:], float64[:,:], float64[:], float64[:]))\
+    (float64[:], float64[:,:], int32, int32, float32)"], fastmath=True,
+    parallel=False)
+def generalized_orthogonal_matching_pursuit(
+    signal: np.ndarray,
+    dictionary: np.ndarray,
+    K: int = 0,
+    N: int = 3,
+    eps: float = 1e-3
+):
+    if K <= 0 or K > dictionary.shape[1]:
+        K = dictionary.shape[1]
+
+    m = len(signal)
+    signal = np.ascontiguousarray(signal)
+    residual = np.ascontiguousarray(signal)
+    dictionary = np.ascontiguousarray(dictionary)
+    atoms = np.full((m, K), 0., np.float64)
+    errors = np.full(K, 0., np.float64)
+
+    k = 0
+    while np.sqrt(np.sum(np.square(residual))) > eps:
+        dot_product = np.dot(residual, dictionary)
+        inds = np.abs(dot_product).argsort()[-N:][::-1]
+
+        atoms[:, k*N:(k+1)*N] = dictionary[:, inds]
+
+        # If dictionary contains complex values,
+        # use np.conj(A).T instead of A.T
+        A = np.ascontiguousarray(atoms[:, :(k+1)*N])
+        estimate = np.dot(np.dot(np.linalg.inv(np.dot(A.T, A)), A.T), signal)
+        residual = signal - np.dot(A, estimate)
+        errors[k] = np.sqrt(np.sum(np.square(residual)))
+
+        # Removing the deletion step makes computation faster in some cases.
+        dictionary = np.ascontiguousarray(delete_column(dictionary, inds))
+
+        k += 1
+        if k == K or dictionary.size == 0:
+            break
+
+    errors = errors[:k]
+    atoms = np.ascontiguousarray(atoms[:, :k*N])
+    coefficients = estimate
     return coefficients, atoms, residual, errors
