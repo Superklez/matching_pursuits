@@ -24,7 +24,7 @@ def matching_pursuit(
     errors = np.full(m, 0.)
 
     i = 0
-    while np.sum(np.square(residual)) > eps:
+    while np.sqrt(np.sum(np.square(residual))) > eps:
         dot_product = np.dot(residual, dictionary)
         max_ind = np.argmax(np.abs(dot_product))
 
@@ -32,7 +32,7 @@ def matching_pursuit(
         atoms[:, i] = dictionary[:, max_ind]
 
         residual = residual - coefficients[:, i] * atoms[:, i]
-        errors[i] = np.sum(np.square(residual))
+        errors[i] = np.sqrt(np.sum(np.square(residual)))
 
         # Removing the deletion step makes computation faster in some cases.
         dictionary = np.ascontiguousarray(delete_column(dictionary, max_ind))
@@ -66,7 +66,7 @@ def orthogonal_matching_pursuit(
     errors = np.full(m, 0., np.float64)
 
     i = 0
-    while np.sum(np.square(residual)) > eps:
+    while np.sqrt(np.sum(np.square(residual))) > eps:
         dot_product = np.dot(residual, dictionary)
         max_ind = np.argmax(np.abs(dot_product))
 
@@ -75,9 +75,9 @@ def orthogonal_matching_pursuit(
         # If dictionary contains complex values,
         # use np.conj(A).T instead of A.T
         A = np.ascontiguousarray(atoms[:, :i+1])
-        P = np.dot(A, np.dot(np.linalg.inv(np.dot(A.T, A)), A.T))
-        residual = signal - np.dot(signal, P)
-        errors[i] = np.sum(np.square(residual))
+        estimate = np.dot(np.dot(np.linalg.inv(np.dot(A.T, A)), A.T), signal.T)
+        residual = signal - np.dot(A, estimate).T
+        errors[i] = np.sqrt(np.sum(np.square(residual)))
 
         # Removing the deletion step makes computation faster in some cases.
         dictionary = np.ascontiguousarray(delete_column(dictionary, max_ind))
