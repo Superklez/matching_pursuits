@@ -38,7 +38,7 @@ def matching_pursuit(
         if k >= 1 and errors[k] > errors[k-1]:
             print("WARNING: Diverging solution. Ending approximation loop.")
             break
-        if abs(errors[k] - errors[k-1]) < eps:
+        if k >= 1 and abs(errors[k] - errors[k-1]) < eps:
             print("WARNING: Solution not improving. Ending approximation loop.")
             break
 
@@ -92,7 +92,7 @@ def orthogonal_matching_pursuit(
         if k >= 1 and errors[k] > errors[k-1]:
             print("WARNING: Diverging solution. Ending approximation loop.")
             break
-        if abs(errors[k] - errors[k-1]) < eps:
+        if k >= 1 and abs(errors[k] - errors[k-1]) < eps:
             print("WARNING: Solution not improving. Ending approximation loop.")
             break
 
