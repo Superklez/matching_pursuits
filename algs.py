@@ -88,6 +88,5 @@ def orthogonal_matching_pursuit(
     
     errors = errors[:i]
     atoms = np.ascontiguousarray(atoms[:, :i])
-    coefficients = np.dot(signal, np.dot(np.linalg.inv(np.dot(atoms.T, atoms)),
-        atoms.T).T)
+    coefficients = estimate.T
     return coefficients, atoms, residual, errors
