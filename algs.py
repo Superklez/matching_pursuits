@@ -100,7 +100,7 @@ def orthogonal_matching_pursuit(
         dictionary = np.ascontiguousarray(delete_column(dictionary, inds))
 
         k += 1
-        if k == K or dictionary.size == 0:
+        if dictionary.size == 0:
             break
 
     errors = errors[:k]
