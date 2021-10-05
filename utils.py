@@ -2,7 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numba import jit
 
-@jit(["float64[:](float64[:], float64[:,:], float64[:])"],
+@jit(["float64[:](float64[:], float64[:,:], float64[:])",
+      "float32[:](float32[:], float32[:,:], float32[:])"],
     fastmath=True, parallel=False)
 def reconstruct_signal(
     coefficients: np.ndarray,
@@ -17,9 +18,9 @@ def reconstruct_signal(
     return reconstructed_signal
 
 @jit(["float64[:,:](float64[:,:], int64[:])",
-      "float64[:,:](float64[:,:], int32)",
-      "int64[:,:](int64[:,:], int64[:])",
-      "int64[:,:](int64[:,:], int32)"],
+      "float64[:,:](float64[:,:], int64)",
+      "float32[:,:](float32[:,:], int64[:])",
+      "float32[:,:](float32[:,:], int64)"],
      fastmath=True, parallel=False)
 def delete_column(arr, inds):
     mask = np.full(arr.shape[1], 0.) == 0
