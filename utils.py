@@ -10,6 +10,11 @@ def reconstruct_signal(
     atoms: np.ndarray,
     signal: np.ndarray
 ):
+    """
+    Reconstructs signal from the coefficients and atoms. Also calculates the
+    MSE and RMSE error of the reconstructed signal with respect to the original
+    signal.
+    """
     reconstructed_signal = np.sum(atoms * coefficients, axis=1)
     mse = np.sum(np.power(signal - reconstructed_signal, 2))
     rmse = np.sqrt(mse)
@@ -23,6 +28,10 @@ def reconstruct_signal(
       "float32[:,:](float32[:,:], int64)"],
      fastmath=True, parallel=False)
 def delete_column(arr, inds):
+    """
+    Remove column based on indices passed. This was implemented because Numba
+    does not support the 2D version of np.delete.
+    """
     mask = np.full(arr.shape[1], 0.) == 0
     mask[inds] = False
     return arr[:, mask]
