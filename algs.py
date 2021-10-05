@@ -106,7 +106,7 @@ def orthogonal_matching_pursuit(
         dictionary = np.ascontiguousarray(delete_column(dictionary, inds))
 
         k += 1
-        if dictionary.size == 0:
+        if k*N >= min([K, m//N]) or dictionary.size == 0:
             break
 
     errors = errors[:k]
