@@ -14,6 +14,16 @@ def dct2_basis(N: int, dtype: type = np.float32):
                 + 1 / 2) * k, dtype=dtype))
     return np.array(basis, dtype=dtype).T
 
+def dst2_basis(N: int, dtype: type = np.float32):
+    '''
+    Discrete sine transform-II (DST-II) basis.
+    '''
+    basis = []
+    for k in range(N):
+        basis.append(np.sin(math.pi / N * (np.arange(N) \
+            + 1 / 2) * (k + 1), dtype=dtype))
+    return np.array(basis, dtype=dtype).T
+
 def sin_basis(N: int, dtype: type = np.float32):
     '''
     Sine subdictionary.
