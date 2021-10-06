@@ -5,9 +5,9 @@ from .utils import delete_column
 
 float_array = types.float64[:]
 
-@jit(["Tuple((float64[:], float64[:,:], float64[:], float64[:]))\
+@jit(["Tuple((float64[:], float64[:,:], float64[:], int32[:]))\
     (float64[:], float64[:,:], int32, float32)",
-    "Tuple((float32[:], float32[:,:], float32[:], float32[:]))\
+    "Tuple((float32[:], float32[:,:], float32[:], int32[:]))\
     (float32[:], float32[:,:], int32, float32)"], fastmath=True,
     parallel=False)
 def matching_pursuit(
@@ -32,7 +32,7 @@ def matching_pursuit(
     coefficients (float 1D): Matrix of coefficients.
     atoms (float 2D): Matrix of atoms extracted.
     residual (float 1D): Residual after termination main loop.
-    errors (float 1D): L2-norm of the residual per iteration.
+    indices (float 1D): Column indices of the selected atoms.
     """
 
     # Limit the maximum sparsity to the number of atoms, i.e., all atoms may
@@ -49,7 +49,7 @@ def matching_pursuit(
     m = len(signal)
     coefficients = np.full(K, 0., dtype=signal.dtype)
     atoms = np.full((m, K), 0., dtype=signal.dtype)
-    errors = np.full(K, 0., dtype=signal.dtype)
+    indices = np.full(K, 0., dtype=np.int32)
 
     # The original signal's L2-norm is constant, so we calculate it before of
     # the loop to avoid calculating it for each iteration.
@@ -62,6 +62,7 @@ def matching_pursuit(
         # determine its index.
         dot_product = np.dot(residual, dictionary)
         max_ind = np.argmax(np.abs(dot_product))
+        indices[k] = max_ind
 
         # Assign the maximum dot product (in magnitude) to the kth order
         # coefficient, and the dictionary that yielded the maximum dot product
@@ -71,21 +72,6 @@ def matching_pursuit(
 
         # Update residual.
         residual = residual - coefficients[k] * atoms[:, k]
-
-        # Store current error. Note: This may be removed in a future update.
-        errors[k] = np.sqrt(np.sum(np.square(residual)))
-
-        # Early stopping when the solution diverges. I noticed in some cases
-        # that the solution starts to diverge when the error becomes to low.
-        # This is a simple fix for that problem.
-        if k >= 1 and errors[k] > errors[k-1]:
-            print("WARNING: Diverging solution. Ending approximation loop.")
-            break
-        # Terminate main loop if there is no improvement in the error.
-        # This may be removed in a future update.
-        # if k >= 1 and abs(errors[k] - errors[k-1]) < eps:
-        #     print("WARNING: Solution not improving. Ending approximation loop.")
-        #     break
 
         # Remove the selected atom from the dictionary of atoms. This is to
         # ensure that no atom gets selected twice. Removing the deletion step
@@ -98,15 +84,15 @@ def matching_pursuit(
         if k == K or dictionary.size == 0:
             break
 
-    errors = errors[:k]
+    indices = indices[:k]
     coefficients = coefficients[:k]
     atoms = atoms[:, :k]
 
-    return coefficients, atoms, residual, errors
+    return coefficients, atoms, residual, indices
 
-@jit(["Tuple((float64[:], float64[:,:], float64[:], float64[:]))\
+@jit(["Tuple((float64[:], float64[:,:], float64[:], int32[:]))\
     (float64[:], float64[:,:], int32, int32, float32)",
-    "Tuple((float32[:], float32[:,:], float32[:], float32[:]))\
+    "Tuple((float32[:], float32[:,:], float32[:], int32[:]))\
     (float32[:], float32[:,:], int32, int32, float32)"], fastmath=True,
     parallel=False)
 def orthogonal_matching_pursuit(
@@ -133,7 +119,7 @@ def orthogonal_matching_pursuit(
     coefficients (float 1D): Matrix of coefficients.
     atoms (float 2D): Matrix of atoms extracted.
     residual (float 1D): Residual after termination main loop.
-    errors (float 1D): L2-norm of the residual per iteration.
+    indices (float 1D): Column indices of the selected atoms.
     """
 
     # Limit the maximum sparsity to the number of atoms, i.e., all atoms may
@@ -150,7 +136,7 @@ def orthogonal_matching_pursuit(
     # Initialize coefficients, atoms, and errors
     m = len(signal)
     atoms = np.full((m, K), 0., dtype=dictionary.dtype)
-    errors = np.full(K, 0., dtype=signal.dtype)
+    indices = np.full(K, 0., dtype=np.int32)
 
     # The original signal's L2-norm is constant, so we calculate it before of
     # the loop to avoid calculating it for each iteration.
@@ -163,6 +149,7 @@ def orthogonal_matching_pursuit(
         # determine their indices.
         dot_product = np.dot(residual, dictionary)
         inds = np.abs(dot_product).argsort()[-N:][::-1]
+        indices[k*N:(k+1)*N] = inds
 
         # Store selected atoms.
         atoms[:, k*N:(k+1)*N] = dictionary[:, inds]
@@ -173,37 +160,15 @@ def orthogonal_matching_pursuit(
         estimate = np.dot(np.dot(np.linalg.inv(np.dot(A.T, A)), A.T), signal)
         residual = signal - np.dot(A, estimate)
 
-        # Store error, i.e., the L2-norm of the residual. Note: This may be
-        # removed in a future update.
-        errors[k] = np.sqrt(np.sum(np.square(residual)))
-
-        # Early stopping when the solution diverges. I noticed in some cases
-        # that the solution starts to diverge when the error becomes to low.
-        # This is a simple fix for that problem.
-        if k >= 1 and errors[k] > errors[k-1]:
-            print("WARNING: Diverging solution. Ending approximation loop.")
-            break
-
-        # Terminate main loop if there is no improvement in the error.
-        # This may be removed in a future update.
-        # if k >= 1 and abs(errors[k] - errors[k-1]) < eps:
-        #     print("WARNING: Solution not improving. Ending approximation loop.")
-        #     break
-
-        # Remove the selected atoms from the dictionary of atoms. This is to
-        # ensure that no atom gets selected twice. Removing the deletion step
-        # makes computation faster in some cases.
-        dictionary = np.ascontiguousarray(delete_column(dictionary, inds))
-
         # If we have reached the desired sparsity or there are no atoms left
         # in the dictionary, then terminate the main loop.
         k += 1
         if k*N >= K or dictionary.size == 0:
             break
 
-    errors = errors[:k]
+    indices = indices[:k*N]
     atoms = np.ascontiguousarray(atoms[:, :k*N])
     coefficients = np.dot(np.dot(np.linalg.inv(np.dot(atoms.T, atoms)),
         atoms.T), signal)
 
-    return coefficients, atoms, residual, errors
+    return coefficients, atoms, residual, indices
