@@ -32,7 +32,7 @@ def matching_pursuit(
     coefficients (float 1D): Matrix of coefficients.
     atoms (float 2D): Matrix of atoms extracted.
     residual (float 1D): Residual after termination main loop.
-    errors (float 1D): L2-norm of the residual per iteration.
+    indices (float 1D): Column indices of the selected atoms.
     """
 
     # Limit the maximum sparsity to the number of atoms, i.e., all atoms may
@@ -119,7 +119,7 @@ def orthogonal_matching_pursuit(
     coefficients (float 1D): Matrix of coefficients.
     atoms (float 2D): Matrix of atoms extracted.
     residual (float 1D): Residual after termination main loop.
-    errors (float 1D): L2-norm of the residual per iteration.
+    indices (float 1D): Column indices of the selected atoms.
     """
 
     # Limit the maximum sparsity to the number of atoms, i.e., all atoms may
