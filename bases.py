@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-def dct_basis(N: int, dtype: type = np.float32):
+def dct2_basis(N: int, dtype: type = np.float32):
     '''
     Discrete cosine transfor-II (DCT-II) orthogonal basis.
     '''
@@ -14,43 +14,31 @@ def dct_basis(N: int, dtype: type = np.float32):
                 + 1 / 2) * k, dtype=dtype))
     return np.array(basis, dtype=dtype).T
 
-def sin_basis(N: int, fs: int = 16000):
+def sin_basis(N: int, dtype: type = np.float32):
     '''
     Sine subdictionary.
     '''
     basis = []
     for k in range(1, math.ceil(N / 2) + 1):
-        atom = np.sin(2 * np.pi * k * np.linspace(0, 1, fs, endpoint=False))
-        while len(atom) < N:
-            atom = np.tile(atom, 2)
-        atom = atom[:N]
-        basis.append(atom)
+        basis.append(np.sin(2 * np.pi * k * np.linspace(0, 1, N), dtype=dtype))
     return np.array(basis).T
 
-def cos_basis(N: int, fs: int = 16000):
+def cos_basis(N: int, dtype: type = np.float32):
     '''
     Cosine subdictionary.
     '''
     basis = []
     for k in range(1, math.ceil(N / 2) + 1):
-        atom = np.cos(2 * np.pi * k * np.linspace(0, 1, fs, endpoint=False))
-        while len(atom) < N:
-            atom = np.tile(atom, 2)
-        atom = atom[:N]
-        basis.append(atom)
+        basis.append(np.cos(2 * np.pi * k * np.linspace(0, 1, N), dtype=dtype))
     return np.array(basis).T
 
-def poly_basis(t: int, fs: int = 16000):
+def poly_basis(N: int, dtype: type = np.float32):
     '''
-    Kronecker delta subdictionary.
+    Polynomial subdictionary.
     '''
     basis = []
     for n in range(1, 21):
-        atom = np.power(np.linspace(0, 1, fs, endpoint=False), n - 1)
-        while len(atom) < t:
-            atom = np.tile(atom, 2)
-        atom = atom[:t]
-        basis.append(atom)
+        basis.append(np.power(np.linspace(0, 1, N, dtype=dtype), n - 1))
     return np.array(basis).T
 
 def kd_basis(N: int, dtype: type = np.float32):
