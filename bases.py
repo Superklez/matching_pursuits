@@ -86,48 +86,37 @@ def dht_basis(N: int, dtype: type = np.float32):
             - np.pi / 4, dtype=dtype))
     return np.array(basis).T
 
-def erb(fc: float):
-    """
-    Only valid for frequencies in the range 0 Hz to 10 kHz.
-    """
-    return 24.7 * (4.37 * fc / 1000 + 1)
-
-def gammatone_function(
+def gabor_atom(
     N: int,
-    fc: int,
-    fs: int = 16000,
-    l: int = 4,
-    b: float = 1.019,
-    dtype: type = np.float32
+    w: float,
+    s: float,
+    u: int,
+    theta: float = 0
 ):
-    nT = np.arange(0, N) / fs
-    return np.power(nT, l-1) * np.exp(-2*np.pi*b*erb(fc)*nT) * np.cos(
-        2*np.pi*fc*nT, dtype=dtype)
+    return np.sqrt(1 / s) * np.exp(-np.pi*np.square(np.arange(N)-u)/(s*s)) \
+        * np.cos(2*np.pi*w*(np.arange(N)-u) - theta)
 
-def gammatone_matrix(
+def gabor_basis(
     N: int,
-    fc: int,
-    fs: int = 16000,
-    step: int = 8,
-    l: int = 4,
-    b: float = 1.019,
-    dtype: type = np.float32
-):  
+    i_vals: list = range(1, 36),
+    p_vals: list = range(1, 9),
+    u_step: int = 64
+):
     """
-    Gammatone matrix. Please don't use this, it isn't optimized yet. It already
-    works so I dind't want to touch it anymore.
+    Gabor basis.
     """
-    tc = (l - 1) / (2 * np.pi * b * erb(fc))
-    centers = np.arange(-int(tc*fs), int(N - tc*fs) + step, step)
-    basis = []
-    for center in centers:
-        if center < 0:
-            gammatone = gammatone_function(N+abs(center), fc, fs, l, b, dtype)
-            atom = gammatone[abs(center):]
-        else:
-            gammatone = gammatone_function(N, fc, fs, l, b, dtype)
-            atom = np.full(N, 0., dtype)
-            atom[center:] = gammatone[:N-center]
-        basis.append(atom) 
-    basis = np.array(basis, dtype=dtype).T
-    return basis
+    K = 0.5 * i_vals[-1]**(-2.6)
+
+    a_freqs = [K*i**2.6 for i in i_vals]
+    scales = [2**p for p in p_vals]
+    time_shifts = range(0, N, u_step)
+
+    dictionary = []
+
+    for i in range(len(a_freqs)):
+        for j in range(len(scales)):
+            for k in range(len(time_shifts)):
+                dictionary.append(gabor_atom(N, a_freqs[i], scales[j],
+                    time_shifts[k]))
+
+    return np.array(dictionary).T
