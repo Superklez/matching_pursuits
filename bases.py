@@ -85,3 +85,49 @@ def dht_basis(N: int, dtype: type = np.float32):
         basis.append(np.sqrt(2 / N) * np.cos(2 * np.pi * np.arange(N) * k / N \
             - np.pi / 4, dtype=dtype))
     return np.array(basis).T
+
+def erb(fc: float):
+    """
+    Only valid for frequencies in the range 0 Hz to 10 kHz.
+    """
+    return 24.7 * (4.37 * fc / 1000 + 1)
+
+def gammatone_function(
+    N: int,
+    fc: int,
+    fs: int = 16000,
+    l: int = 4,
+    b: float = 1.019,
+    dtype: type = np.float32
+):
+    nT = np.arange(0, N) / fs
+    return np.power(nT, l-1) * np.exp(-2*np.pi*b*erb(fc)*nT) * np.cos(
+        2*np.pi*fc*nT, dtype=dtype)
+
+def gammatone_matrix(
+    N: int,
+    fc: int,
+    fs: int = 16000,
+    step: int = 8,
+    l: int = 4,
+    b: float = 1.019,
+    dtype: type = np.float32
+):  
+    """
+    Gammatone matrix. Please don't use this, it isn't optimized yet. It already
+    works so I dind't want to touch it anymore.
+    """
+    tc = (l - 1) / (2 * np.pi * b * erb(fc))
+    centers = np.arange(-int(tc*fs), int(N - tc*fs) + step, step)
+    basis = []
+    for center in centers:
+        if center < 0:
+            gammatone = gammatone_function(N+abs(center), fc, fs, l, b, dtype)
+            atom = gammatone[abs(center):]
+        else:
+            gammatone = gammatone_function(N, fc, fs, l, b, dtype)
+            atom = np.full(N, 0., dtype)
+            atom[center:] = gammatone[:N-center]
+        basis.append(atom) 
+    basis = np.array(basis, dtype=dtype).T
+    return basis
