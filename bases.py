@@ -100,7 +100,8 @@ def gabor_basis(
     N: int,
     i_vals: list = range(1, 36),
     p_vals: list = range(1, 9),
-    u_step: int = 64
+    u_step: int = 64,
+    dtype: type = np.float32
 ):
     """
     Gabor basis.
@@ -119,4 +120,4 @@ def gabor_basis(
                 dictionary.append(gabor_atom(N, a_freqs[i], scales[j],
                     time_shifts[k]))
 
-    return np.array(dictionary).T
+    return np.array(dictionary, dtype).T
