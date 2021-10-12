@@ -73,11 +73,6 @@ def matching_pursuit(
         # Update residual.
         residual = residual - coefficients[k] * atoms[:, k]
 
-        # Remove the selected atom from the dictionary of atoms. This is to
-        # ensure that no atom gets selected twice. Removing the deletion step
-        # makes computation faster in some cases.
-        dictionary = np.ascontiguousarray(delete_column(dictionary, max_ind))
-
         k += 1
         # If we have reached the desired sparsity or there are no atoms left
         # in the dictionary, then terminate the main loop.
