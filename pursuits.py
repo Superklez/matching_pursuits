@@ -50,6 +50,7 @@ def matching_pursuit(
     coefficients = np.full(K, 0., dtype=signal.dtype)
     atoms = np.full((m, K), 0., dtype=signal.dtype)
     indices = np.full(K, 0., dtype=np.int32)
+    all_inds = np.arange(dictionary.shape[1], dtype=np.int32)
 
     # The original signal's L2-norm is constant, so we calculate it before of
     # the loop to avoid calculating it for each iteration.
@@ -62,7 +63,7 @@ def matching_pursuit(
         # determine its index.
         dot_product = np.dot(residual, dictionary)
         max_ind = np.argmax(np.abs(dot_product))
-        indices[k] = max_ind
+        indices[k] = all_inds[max_ind]
 
         # Assign the maximum dot product (in magnitude) to the kth order
         # coefficient, and the dictionary that yielded the maximum dot product
@@ -72,6 +73,10 @@ def matching_pursuit(
 
         # Update residual.
         residual = residual - coefficients[k] * atoms[:, k]
+
+        # Remove selected atoms from dictionary.
+        dictionary = np.ascontiguousarray(delete_column(dictionary, max_ind))
+        all_inds = np.delete(all_inds, max_ind)
 
         k += 1
         # If we have reached the desired sparsity or there are no atoms left
@@ -132,6 +137,7 @@ def orthogonal_matching_pursuit(
     m = len(signal)
     atoms = np.full((m, K), 0., dtype=dictionary.dtype)
     indices = np.full(K, 0., dtype=np.int32)
+    all_inds = np.arange(dictionary.shape[1], dtype=np.int32)
 
     # The original signal's L2-norm is constant, so we calculate it before of
     # the loop to avoid calculating it for each iteration.
@@ -144,7 +150,7 @@ def orthogonal_matching_pursuit(
         # determine their indices.
         dot_product = np.dot(residual, dictionary)
         inds = np.abs(dot_product).argsort()[-N:][::-1]
-        indices[k*N:(k+1)*N] = inds
+        indices[k*N:(k+1)*N] = all_inds[inds]
 
         # Store selected atoms.
         atoms[:, k*N:(k+1)*N] = dictionary[:, inds]
@@ -154,6 +160,10 @@ def orthogonal_matching_pursuit(
         A = np.ascontiguousarray(atoms[:, :(k+1)*N])
         estimate = np.dot(np.dot(np.linalg.inv(np.dot(A.T, A)), A.T), signal)
         residual = signal - np.dot(A, estimate)
+
+        # Remove selected atoms from dictionary.
+        dictionary = np.ascontiguousarray(delete_column(dictionary, inds))
+        all_inds = np.delete(all_inds, inds)
 
         # If we have reached the desired sparsity or there are no atoms left
         # in the dictionary, then terminate the main loop.
