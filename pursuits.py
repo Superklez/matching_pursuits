@@ -1,15 +1,12 @@
 import numpy as np
 from numba import jit
-from numba import types
-from .utils import delete_column
-
-float_array = types.float64[:]
+from .utils import delete_row
 
 @jit(["Tuple((float64[:], float64[:,:], float64[:], int32[:]))\
     (float64[:], float64[:,:], int32, float32)",
     "Tuple((float32[:], float32[:,:], float32[:], int32[:]))\
-    (float32[:], float32[:,:], int32, float32)"], fastmath=True,
-    parallel=False)
+    (float32[:], float32[:,:], int32, float32)"],
+    fastmath=True, parallel=False)
 def matching_pursuit(
     signal: np.ndarray,
     dictionary: np.ndarray,
@@ -37,8 +34,8 @@ def matching_pursuit(
 
     # Limit the maximum sparsity to the number of atoms, i.e., all atoms may
     # be used.
-    if K <= 0 or K > dictionary.shape[1]:
-        K = dictionary.shape[1]
+    if K <= 0 or K > len(dictionary):
+        K = len(dictionary)
     
     # Store the residual and dictionary as contiguous arrays in memory to speed
     # up the calculation of the dot product.
@@ -47,10 +44,10 @@ def matching_pursuit(
 
     # Initialize coefficients, atoms, and errors
     m = len(signal)
-    coefficients = np.full(K, 0., dtype=signal.dtype)
-    atoms = np.full((m, K), 0., dtype=signal.dtype)
-    indices = np.full(K, 0., dtype=np.int32)
-    all_inds = np.arange(dictionary.shape[1], dtype=np.int32)
+    coefficients = np.empty(K, dtype=signal.dtype)
+    atoms = np.empty((K, m), dtype=signal.dtype)
+    indices = np.empty(K, dtype=np.int32)
+    all_inds = np.arange(len(dictionary), dtype=np.int32)
 
     # The original signal's L2-norm is constant, so we calculate it before of
     # the loop to avoid calculating it for each iteration.
@@ -61,7 +58,7 @@ def matching_pursuit(
     while  np.sqrt(np.sum(np.square(residual))) / signal_l2 > maxerr:
         # Determine which atom is most correlated to the current residual and
         # determine its index.
-        dot_product = np.dot(residual, dictionary)
+        dot_product = np.dot(dictionary, residual)
         max_ind = np.argmax(np.abs(dot_product))
         indices[k] = all_inds[max_ind]
 
@@ -69,32 +66,32 @@ def matching_pursuit(
         # coefficient, and the dictionary that yielded the maximum dot product
         # to the kth order atom.
         coefficients[k] = dot_product[max_ind]
-        atoms[:, k] = dictionary[:, max_ind]
+        atoms[k] = dictionary[max_ind]
 
         # Update residual.
-        residual = residual - coefficients[k] * atoms[:, k]
+        residual = residual - coefficients[k] * atoms[k]
 
         # Remove selected atoms from dictionary.
-        dictionary = np.ascontiguousarray(delete_column(dictionary, max_ind))
+        dictionary = np.ascontiguousarray(delete_row(dictionary, max_ind))
         all_inds = np.delete(all_inds, max_ind)
 
         k += 1
         # If we have reached the desired sparsity or there are no atoms left
         # in the dictionary, then terminate the main loop.
-        if k == K or dictionary.size == 0:
+        if k == K or len(dictionary) == 0:
             break
 
     indices = indices[:k]
     coefficients = coefficients[:k]
-    atoms = atoms[:, :k]
+    atoms = atoms[:k]
 
     return coefficients, atoms, residual, indices
 
 @jit(["Tuple((float64[:], float64[:,:], float64[:], int32[:]))\
     (float64[:], float64[:,:], int32, int32, float32)",
     "Tuple((float32[:], float32[:,:], float32[:], int32[:]))\
-    (float32[:], float32[:,:], int32, int32, float32)"], fastmath=True,
-    parallel=False)
+    (float32[:], float32[:,:], int32, int32, float32)"],
+    fastmath=True, parallel=False)
 def orthogonal_matching_pursuit(
     signal: np.ndarray,
     dictionary: np.ndarray,
@@ -124,20 +121,20 @@ def orthogonal_matching_pursuit(
 
     # Limit the maximum sparsity to the number of atoms, i.e., all atoms may
     # be used.
-    if K <= 0 or K > dictionary.shape[1]:
-        K = dictionary.shape[1] // N * N
+    if K <= 0 or K > len(dictionary):
+        K = len(dictionary) // N * N
 
     # Store the residual and dictionary as contiguous arrays in memory to speed
     # up the calculation of the dot product.
     signal = np.ascontiguousarray(signal)
-    residual = np.ascontiguousarray(signal)
     dictionary = np.ascontiguousarray(dictionary)
+    residual = np.copy(signal)
 
     # Initialize coefficients, atoms, and errors
     m = len(signal)
-    atoms = np.full((m, K), 0., dtype=dictionary.dtype)
-    indices = np.full(K, 0., dtype=np.int32)
-    all_inds = np.arange(dictionary.shape[1], dtype=np.int32)
+    atoms = np.empty((K, m), dtype=dictionary.dtype)
+    indices = np.empty(K, dtype=np.int32)
+    all_inds = np.arange(len(dictionary), dtype=np.int32)
 
     # The original signal's L2-norm is constant, so we calculate it before of
     # the loop to avoid calculating it for each iteration.
@@ -148,32 +145,30 @@ def orthogonal_matching_pursuit(
     while np.sqrt(np.sum(np.square(residual))) / signal_l2 > maxerr:
         # Determine the N most correlated atoms to the current residual and
         # determine their indices.
-        dot_product = np.dot(residual, dictionary)
+        dot_product = np.dot(dictionary, residual)
         inds = np.abs(dot_product).argsort()[-N:][::-1]
         indices[k*N:(k+1)*N] = all_inds[inds]
 
         # Store selected atoms.
-        atoms[:, k*N:(k+1)*N] = dictionary[:, inds]
+        atoms[k*N:(k+1)*N] = dictionary[inds]
 
         # Update residual.
         # If dictionary contains complex values, use np.conj(A).T instead of A.T
-        A = np.ascontiguousarray(atoms[:, :(k+1)*N])
-        estimate = np.dot(np.dot(np.linalg.inv(np.dot(A.T, A)), A.T), signal)
-        residual = signal - np.dot(A, estimate)
+        A = atoms[:(k+1)*N]
+        coefficients = np.dot(np.dot(np.linalg.inv(np.dot(A, A.T)), A), signal)
+        residual = signal - np.dot(coefficients, A)
 
         # Remove selected atoms from dictionary.
-        dictionary = np.ascontiguousarray(delete_column(dictionary, inds))
+        dictionary = np.ascontiguousarray(delete_row(dictionary, inds))
         all_inds = np.delete(all_inds, inds)
 
         # If we have reached the desired sparsity or there are no atoms left
         # in the dictionary, then terminate the main loop.
         k += 1
-        if k*N >= K or dictionary.size == 0:
+        if k*N >= K or len(dictionary) == 0:
             break
 
     indices = indices[:k*N]
-    atoms = np.ascontiguousarray(atoms[:, :k*N])
-    coefficients = np.dot(np.dot(np.linalg.inv(np.dot(atoms.T, atoms)),
-        atoms.T), signal)
+    atoms = A
 
     return coefficients, atoms, residual, indices

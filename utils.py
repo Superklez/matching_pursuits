@@ -2,39 +2,33 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numba import jit
 
-@jit(["float64[:](float64[:], float64[:,:], float64[:])",
-      "float32[:](float32[:], float32[:,:], float32[:])"],
+@jit(["float64[:](float64[:], float64[:,:])",
+      "float32[:](float32[:], float32[:,:])"],
     fastmath=True, parallel=False)
 def reconstruct_signal(
     coefficients: np.ndarray,
     atoms: np.ndarray,
-    signal: np.ndarray
 ):
     """
     Reconstructs signal from the coefficients and atoms. Also calculates the
     MSE and RMSE error of the reconstructed signal with respect to the original
     signal.
     """
-    reconstructed_signal = np.sum(atoms * coefficients, axis=1)
-    mse = np.sum(np.power(signal - reconstructed_signal, 2))
-    rmse = np.sqrt(mse)
-    print("MSE: ", mse)
-    print("RMSE:", rmse)
-    return reconstructed_signal
+    return np.sum(coefficients * atoms.T, axis=1)
 
 @jit(["float64[:,:](float64[:,:], int64[:])",
       "float64[:,:](float64[:,:], int64)",
       "float32[:,:](float32[:,:], int64[:])",
       "float32[:,:](float32[:,:], int64)"],
      fastmath=True, parallel=False)
-def delete_column(arr, inds):
+def delete_row(arr, inds):
     """
-    Remove column based on indices passed. This was implemented because Numba
+    Remove row based on indices passed. This was implemented because Numba
     does not support the 2D version of np.delete.
     """
-    mask = np.full(arr.shape[1], 0.) == 0
+    mask = np.zeros(len(arr), arr.dtype) == 0
     mask[inds] = False
-    return arr[:, mask]
+    return arr[mask]
 
 def plot_approximation(
     coefficients: np.ndarray,
@@ -58,13 +52,13 @@ def plot_approximation(
         ax[0].grid(True)
         ax[0].legend(loc="upper right")
         for i in range(max_order):
-            ax[i+1].plot(coefficients[i] * atoms[:, i],
+            ax[i+1].plot(coefficients[i] * atoms[i],
                 label=f"approx order {i+1}")
             ax[i+1].grid(True)
             ax[i+1].legend(loc="upper right")
         if residual is not None:
             ax[max_order+1].plot(residual,
-                label=f"residual order {atoms.shape[1]}")
+                label=f"residual order {len(atoms)}")
             ax[max_order+1].grid(True)
             ax[max_order+1].legend(loc="upper right")
     else:
@@ -73,13 +67,13 @@ def plot_approximation(
         else:
             fig, ax = plt.subplots(max_order, 1, **kwargs)
         for i in range(max_order):
-            ax[i].plot(coefficients[i] * atoms[:, i],
+            ax[i].plot(coefficients[i] * atoms[i],
                 label=f"approx order {i+1}")
             ax[i].grid(True)
             ax[i].legend(loc="upper right")
         if residual is not None:
             ax[max_order].plot(residual,
-                label=f"residual order {atoms.shape[1]}")
+                label=f"residual order {len(atoms)}")
             ax[max_order].grid(True)
             ax[max_order].legend(loc="upper right")
     plt.tight_layout()
